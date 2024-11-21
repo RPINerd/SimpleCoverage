@@ -38,7 +38,9 @@ class Target:
             if i > 0:
                 bp_with_coverage += 1
         bp_pct = bp_with_coverage / self.length
-        print(f"""Total coverage for {self.id} over {self.length} bp: {bp_pct:.2%} ({bp_with_coverage} bp)\n""")
+        avg_coverage = sum(self.coverage_map) / len(self.coverage_map)
+        print(f"Total coverage for {self.id}:", end=" ")
+        print(f"{bp_with_coverage}/{self.length} bp covered ({bp_pct:.2%}), Avg: {avg_coverage:.2f}")
 
     def print_coverage_map(self, columns: int) -> None:
         print(f"Coverage map for target {self.id}:")
