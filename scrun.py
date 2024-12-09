@@ -1,16 +1,16 @@
 """
-    Simple Coverage Tool | RPINerd, 11/20/24
+Simple Coverage Tool | RPINerd, 11/20/24
 
-    Given a list of input seqs (Primers, input, whatever) and a set of
-    target sequences, this tool will calculate the coverage
+Given a list of input seqs (Primers, input, whatever) and a set of
+target sequences, this tool will calculate the coverage
 
-    Allows for a threshold option to be set for allowed mismatches between
-    the input and target sequence
+Allows for a threshold option to be set for allowed mismatches between
+the input and target sequence
 """
 
 import argparse
-import os
 import sys
+from pathlib import Path
 
 from Bio import SeqIO
 from Bio.Align import PairwiseAligner
@@ -22,17 +22,16 @@ from sc_class import Match, Target
 def parse_args() -> argparse.Namespace:
     """
     Basic argument parser for the script
+
+    Returns:
+        argparse.Namespace: The parsed arguments
     """
     parser = argparse.ArgumentParser()
     parser.add_argument("-i", "--input", type=str, help="Path to the input fasta file")
     target_type = parser.add_mutually_exclusive_group(required=True)
     target_type.add_argument("-t", "--targets", type=str, help="Path to the target sequences fasta file")
-    target_type.add_argument(
-        "-a", "--accession", type=str, help="!NOT IMPLEMENTED! Accession ID of the target sequence"
-    )
-    parser.add_argument(
-        "--columns", type=int, required=False, default=80, help="Number of columns to print coverage in"
-    )
+    target_type.add_argument("-a", "--accession", type=str, help="!NOT IMPLEMENTED! Accession ID of the target sequence")
+    parser.add_argument("--columns", type=int, required=False, default=80, help="Number of columns to print coverage in")
     parser.add_argument(
         "-o",
         "--output",
@@ -56,9 +55,15 @@ def parse_args() -> argparse.Namespace:
 def load_fasta(fasta_file: str) -> list[SeqRecord]:
     """
     Load a fasta file and return the SeqRecord objects
+
+    Args:
+        fasta_file (str): Path to the fasta file
+
+    Returns:
+        list[SeqRecord]: List of SeqRecord objects
     """
     records: list[SeqRecord] = []
-    with open(fasta_file, "r") as f:
+    with Path.open(fasta_file, "r") as f:
         for record in SeqIO.parse(f, "fasta"):
             records.append(record)
 
@@ -66,8 +71,15 @@ def load_fasta(fasta_file: str) -> list[SeqRecord]:
 
 
 def main(args: argparse.Namespace) -> None:
-    """"""
+    """
+    Main driver function for the script
 
+    Args:
+        args (argparse.Namespace): The parsed arguments
+
+    Returns:
+        None
+    """
     # Load the input and target sequences
     input = load_fasta(args.input)
     targets = [Target(record) for record in load_fasta(args.targets)]  # - This is kind of silly to do, maybe rework
@@ -79,6 +91,7 @@ def main(args: argparse.Namespace) -> None:
     aligner.target_internal_open_gap_score = -100
     for target in targets:
         print(f"Aligning input to {target.id}...")
+
         for index, seq in enumerate(input):
             print(f"\tAligning {seq.id} ({index + 1}/{len(input)})", end="\r")
             # TODO future func, add a function to calculate mismatches between seq and target
@@ -101,6 +114,7 @@ def main(args: argparse.Namespace) -> None:
                     target.add_match(hit)
         print(" " * 80, end="\r")
         print("Done!")
+
     for target in targets:
         target.print_coverage()
 
@@ -110,9 +124,9 @@ if __name__ == "__main__":
 
     # Check to make sure files provided exist
     files_missing = []
-    if args.input and not os.path.exists(args.input):
+    if args.input and not Path.exists(args.input):
         files_missing.append(f"Input fasta file {args.input} does not exist!")
-    if args.targets and not os.path.exists(args.targets):
+    if args.targets and not Path.exists(args.targets):
         files_missing.append(f"Target fasta file {args.targets} does not exist!")
     if len(files_missing) > 0:
         print("\n".join(files_missing))
@@ -122,7 +136,7 @@ if __name__ == "__main__":
     if args.accession:
         raise NotImplementedError("Accession ID checking not implemented yet")
 
-    if os.path.exists(args.output):
+    if Path.exists(args.output):
         print(f"Output file {args.output} already exists.. will overwrite.")
 
     main(args)
