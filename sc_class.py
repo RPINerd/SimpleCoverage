@@ -7,7 +7,7 @@ class Match:
 
     """Object to store information about a match between a seq and target sequence"""
 
-    def __init__(self, seq_id: str, start: int, end: int, mismatches: list[int] = []) -> None:
+    def __init__(self, seq_id: str, start: int, end: int, mismatches: list[int]) -> None:
         """
         Initialize a Match object with the given information
 
@@ -60,6 +60,19 @@ class Target:
         for i in range(match.start, match.end):
             self.coverage_map[i] += 1
         self.matches.append(match)
+
+    def add_matches(self, matches: list[Match]) -> None:
+        """
+        Add a list of matches to the target sequence and update the coverage map
+
+        Args:
+            matches (list[Match]): List of match objects to add to the target
+
+        Returns:
+            None
+        """
+        for match in matches:
+            self.add_match(match)
 
     def print_coverage(self) -> None:
         """

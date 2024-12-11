@@ -70,6 +70,35 @@ def load_fasta(fasta_file: str) -> list[SeqRecord]:
     return records
 
 
+def align_seqs(seq: SeqRecord, target: SeqRecord) -> list[Match]:
+    """
+    Align the input sequence to the target sequence and return the matches
+
+    Args:
+        seq (SeqRecord): The input sequence
+        target (SeqRecord): The target sequence
+
+    Returns:
+        list[Match]: List of Match objects
+    """
+    aligner: PairwiseAligner = PairwiseAligner()
+    aligner.mode = "local"
+    aligner.open_gap_score = -100
+    aligner.target_internal_open_gap_score = -100
+
+    matches: list[Match] = []
+    alignments = aligner.align(seq.seq, target.seq)
+    for alignment in alignments:
+        # Match/mismatch is +1/-1, so we can use the score to calculate the number of mismatches
+        if alignment.score > (len(seq.seq) - args.mismatches):
+            start = alignment.coordinates[1][0]
+            end = alignment.coordinates[1][1]
+            hit = Match(seq.id, start, end)
+            matches.append(hit)
+
+    return matches
+
+
 def main(args: argparse.Namespace) -> None:
     """
     Main driver function for the script
@@ -85,33 +114,14 @@ def main(args: argparse.Namespace) -> None:
     targets = [Target(record) for record in load_fasta(args.targets)]  # - This is kind of silly to do, maybe rework
 
     # Calculate coverage of the seq pool
-    aligner: PairwiseAligner = PairwiseAligner()
-    aligner.mode = "local"
-    aligner.open_gap_score = -100
-    aligner.target_internal_open_gap_score = -100
     for target in targets:
         print(f"Aligning input to {target.id}...")
 
         for index, seq in enumerate(input):
             print(f"\tAligning {seq.id} ({index + 1}/{len(input)})", end="\r")
             # TODO future func, add a function to calculate mismatches between seq and target
-            alignments = aligner.align(seq.seq, target.seq)
-            for alignment in alignments:
-                # Match/mismatch is +1/-1, so we can use the score to calculate the number of mismatches
-                if alignment.score > (len(seq.seq) - args.mismatches):
-                    # print(alignment.score)
-                    # print(alignment)
-                    # print(f"aligned:\n{alignment.aligned}\n")
-                    # print(f"indices:\n{alignment.indices}\n")
-                    # print(f"sequences:\n{alignment.sequences}\n")
-                    # print(f"counts():\n{alignment.counts()}\n")
-                    # print(f"coordinates:\n{alignment.coordinates}\n")
-                    # print(f"shape:\n{alignment.shape}\n")
-                    # print(f"substitutions:\n{alignment.substitutions}\n")
-                    start = alignment.coordinates[1][0]
-                    end = alignment.coordinates[1][1]
-                    hit = Match(seq.id, start, end)
-                    target.add_match(hit)
+            matches = align_seqs(seq, target)
+            target.add_matches(matches)
         print(" " * 80, end="\r")
         print("Done!")
 
@@ -124,9 +134,9 @@ if __name__ == "__main__":
 
     # Check to make sure files provided exist
     files_missing = []
-    if args.input and not Path.exists(args.input):
+    if args.input and not Path.exists(Path(args.input)):
         files_missing.append(f"Input fasta file {args.input} does not exist!")
-    if args.targets and not Path.exists(args.targets):
+    if args.targets and not Path.exists(Path(args.targets)):
         files_missing.append(f"Target fasta file {args.targets} does not exist!")
     if len(files_missing) > 0:
         print("\n".join(files_missing))
@@ -136,7 +146,7 @@ if __name__ == "__main__":
     if args.accession:
         raise NotImplementedError("Accession ID checking not implemented yet")
 
-    if Path.exists(args.output):
+    if Path.exists(Path(args.output)):
         print(f"Output file {args.output} already exists.. will overwrite.")
 
     main(args)
