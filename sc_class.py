@@ -7,7 +7,7 @@ class Match:
 
     """Object to store information about a match between a seq and target sequence"""
 
-    def __init__(self, seq_id: str, start: int, end: int, mismatches: list[int]) -> None:
+    def __init__(self, seq_id: str, start: int, end: int, mismatches: list[str]) -> None:
         """
         Initialize a Match object with the given information
 
@@ -15,7 +15,7 @@ class Match:
             seq_id (str): The ID of the sequence that matched the target
             start (int): The start position of the match
             end (int): The end position of the match
-            mismatches (list[int], optional): List of mismatch positions in the match. Defaults to [].
+            mismatches (set[int]): Set of mismatch positions in the match.
 
         Returns:
             None
