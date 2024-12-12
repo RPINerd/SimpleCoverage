@@ -1,0 +1,12 @@
+[project]
+name = "SimpleCoverage"
+version = "0.1.0"
+description = "A basic tool to compute coverage of arbitrary sequences against a reference."
+authors = ["RPINerd"]
+license = "GPL-3.0"
+readme = "README.md"
+homepage = "github.com/RPINerd/SimpleCoverage"
+requires-python = ">=3.11"
+dependencies = [
+    "biopython>=1.84",
+]
