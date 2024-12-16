@@ -49,16 +49,36 @@ def configure_logger(log_file: str | None = None) -> logging.Logger:
 
 def parse_args() -> argparse.Namespace:
     """
-    Basic argument parser for the script
+    Basic argument parsing and validation for the script
 
     Returns:
         argparse.Namespace: The parsed arguments
+
+    Raises:
+        NotImplementedError: If the accession ID lookup is requested
+        NotImplementedError: If the output file writing is requested
     """
     parser = argparse.ArgumentParser()
+
+    # Run minimap2 or is file being provided?
+    task_type = parser.add_mutually_exclusive_group(required=True)
+    task_type.add_argument("-p", "--paf-file", type=str, required=False, help="Path to a minimap2 output file")
+    task_type.add_argument("-x", "--minimap2", type=str, required=False, help="Path to the minimap2 executable")
+
+    # Input fasta files
     parser.add_argument("-i", "--input", type=str, help="Path to the input fasta file")
     target_type = parser.add_mutually_exclusive_group(required=True)
     target_type.add_argument("-t", "--targets", type=str, help="Path to the target sequences fasta file")
-    target_type.add_argument("-a", "--accession", type=str, help="!NOT IMPLEMENTED! Accession ID of the target sequence")
+    target_type.add_argument("-a", "--accession", type=str, help="Accession ID of the target sequence")
+
+    # Optional formatting/settings
+    parser.add_argument(
+        "--mismatches",
+        type=int,
+        required=False,
+        default=8,
+        help="Number of allowed mismatches between seq and target",
+    )
     parser.add_argument("-l", "--log", type=str, required=False, help="Log file name, if desired (defauts to stdout)")
     parser.add_argument("--columns", type=int, required=False, default=80, help="Number of columns to print coverage in")
     parser.add_argument(
@@ -66,21 +86,23 @@ def parse_args() -> argparse.Namespace:
         "--output",
         type=str,
         required=False,
-        default="osm_metrics",
-        help="Prefix of the output files for the coverage results",
+        default="sc_metrics.txt",
+        help="Output file for the coverage results",
     )
-    parser.add_argument(
-        "-m",
-        "--mismatches",
-        type=int,
-        required=False,
-        default=8,
-        help="Number of allowed mismatches between seq and target",
-    )
-    parser.add_argument("-f", "--mm2-file", type=str, required=False, help="Path to a minimap2 output file")
-    parser.add_argument("-x", "--minimap2", type=str, required=False, default="minimap2", help="Path to the minimap2 executable")
 
-    return parser.parse_args()
+    args = parser.parse_args()
+
+    # Validate the some of the arguments
+    if args.minimap2 and not args.input:
+        parser.error("--input is required when --minimap2 is specified")
+    if not Path(args.minimap2).exists():
+        parser.error(f"Minimap2 executable {Path(args.minimap2).absolute()} not found!")
+    if args.accession:
+        raise NotImplementedError("Accession ID lookup not implemented yet")
+    if args.output:
+        raise NotImplementedError("Output file writing not implemented yet")
+
+    return args
 
 
 def map_mismatches(cs_str: str) -> list[str]:
@@ -265,6 +287,4 @@ if __name__ == "__main__":
     args = parse_args()
     # Initialize the logger
     logger = configure_logger(args.log)
-    if args.mm2_file is None and args.minimap2 is None:
-        raise ValueError("No input Minimap2 file and Minimap2 executable not found")
     main(args)
