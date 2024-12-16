@@ -248,7 +248,10 @@ def main(args: argparse.Namespace) -> None:
         None
     """
     # Create the minimap2 command
-    if args.mm2_file is None:
+    try:
+        input_mm2_file = args.mm2_file
+
+    except AttributeError:
         minimap2_command = [args.minimap2, "--cs", args.targets, args.input, "-o", "tmp_mm2_output.paf"]
         logger.info(f"Running minimap2 with command: {' '.join(minimap2_command)}")
         minimap2_output = subprocess.run(minimap2_command, capture_output=True, text=True, check=False)
@@ -257,8 +260,6 @@ def main(args: argparse.Namespace) -> None:
             print(minimap2_output.stderr)
             sys.exit(1)
         input_mm2_file = "tmp_mm2_output.paf"
-    else:
-        input_mm2_file = args.mm2_file
 
     # Initialize a list of Targets to store the coverage information
     targets: dict[str, Target] = {}
