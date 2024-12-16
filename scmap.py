@@ -86,7 +86,6 @@ def parse_args() -> argparse.Namespace:
         "--output",
         type=str,
         required=False,
-        default="sc_metrics.txt",
         help="Output file for the coverage results",
     )
 
