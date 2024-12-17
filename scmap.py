@@ -71,7 +71,7 @@ def parse_args() -> argparse.Namespace:
     target_type.add_argument("-t", "--targets", type=str, help="Path to the target sequences fasta file")
     target_type.add_argument("-a", "--accession", type=str, help="Accession ID of the target sequence")
 
-    # Optional formatting/settings
+    # Minimap2 configuration
     parser.add_argument(
         "--mismatches",
         type=int,
@@ -79,6 +79,9 @@ def parse_args() -> argparse.Namespace:
         default=8,
         help="Number of allowed mismatches between seq and target",
     )
+    parser.add_argument("--vars", type=str, required=False, help="Extra minimap2 parameters")
+
+    # Optional formatting/settings
     parser.add_argument("-l", "--log", type=str, required=False, help="Log file name, if desired (defauts to stdout)")
     parser.add_argument("--columns", type=int, required=False, default=80, help="Number of columns to print coverage in")
     parser.add_argument(
@@ -88,6 +91,7 @@ def parse_args() -> argparse.Namespace:
         required=False,
         help="Output file for the coverage results",
     )
+    parser.add_argument("-k", "--keep", required=False, action="store_true", help="Whether to keep the tmp files or not")
 
     args = parser.parse_args()
 
@@ -253,6 +257,8 @@ def main(args: argparse.Namespace) -> None:
 
     except AttributeError:
         minimap2_command = [args.minimap2, "--cs", args.targets, args.input, "-o", "tmp_mm2_output.paf"]
+        if args.vars:
+            minimap2_command.extend(args.vars.split())
         logger.info(f"Running minimap2 with command: {' '.join(minimap2_command)}")
         minimap2_output = subprocess.run(minimap2_command, capture_output=True, text=True, check=False)
         if minimap2_output.returncode != 0:
@@ -274,8 +280,7 @@ def main(args: argparse.Namespace) -> None:
         target.print_coverage()
 
     # Cleanup
-    cleanup = True
-    if cleanup:
+    if not args.keep:
         logger.info("Cleaning up temporary files...")
         Path("tmp_mm2_output.paf").unlink()
     else:
