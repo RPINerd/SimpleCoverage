@@ -1,5 +1,8 @@
 """
-A revision of scrun.py that uses minimap2 to align reads to the reference genome for a massive speed increase
+Simple Coverage Tool (using minimap2) | RPINerd, 12/16/24
+
+Given an arbitrary set of sequences and an arbitrary collection of reference sequences, summarize the
+coverage of the reference by the input.
 """
 
 import argparse
@@ -12,6 +15,9 @@ from pathlib import Path
 from Bio import SeqIO
 
 from sc_class import Match, Target
+
+ROW_FAILURE_LIMIT = 100
+PAF_ROWS = 12
 
 
 def configure_logger(log_file: str | None = None) -> logging.Logger:
@@ -187,13 +193,13 @@ def parse_paf(paf_file: Path, targets: dict[str, Target]) -> dict[str, Target]:
         for line in f.readlines():
             row_index += 1
 
-            if failed_rows > 100:
+            if failed_rows > ROW_FAILURE_LIMIT:
                 logger.error("Too many failed rows, exiting")
                 raise ValueError(f"Too many failed rows! Check the formatting of {paf_file}")
 
             cols = line.split("\t")
-            if len(cols) < 12:
-                logger.warning(f"Row {row_index} of PAF file not contain enough columns! (12+ expected, got {len(cols)})")
+            if len(cols) < PAF_ROWS:
+                logger.warning(f"Row {row_index} of PAF file column count error! (12+ expected, got {len(cols)})")
                 failed_rows += 1
                 continue
 
@@ -251,6 +257,11 @@ def main(args: argparse.Namespace) -> None:
     Returns:
         None
     """
+    # Initialize a list of Targets to store the coverage information
+    targets: dict[str, Target] = {}
+    for record in SeqIO.parse(args.targets, "fasta"):
+        targets[record.id] = Target(record)
+
     # Create the minimap2 command
     try:
         input_mm2_file = args.mm2_file
@@ -266,11 +277,6 @@ def main(args: argparse.Namespace) -> None:
             print(minimap2_output.stderr)
             sys.exit(1)
         input_mm2_file = "tmp_mm2_output.paf"
-
-    # Initialize a list of Targets to store the coverage information
-    targets: dict[str, Target] = {}
-    for record in SeqIO.parse(args.targets, "fasta"):
-        targets[record.id] = Target(record)
 
     # Extend targets with parsed minimap2 output
     targets = parse_paf(Path(input_mm2_file), targets)

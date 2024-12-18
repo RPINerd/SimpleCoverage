@@ -1,5 +1,5 @@
 """
-Simple Coverage Tool | RPINerd, 11/20/24
+Simple Coverage Tool (deprecated) | RPINerd, 11/20/24
 
 Given a list of input seqs (Primers, input, whatever) and a set of
 target sequences, this tool will calculate the coverage
