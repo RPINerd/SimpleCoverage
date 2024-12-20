@@ -34,19 +34,19 @@ def configure_logger(log_file: str | None = None) -> logging.Logger:
         logging.Logger: Configured logger instance.
     """
     logger = logging.getLogger("scmap_logger")
-    logger.setLevel(logging.DEBUG)
+    logger.setLevel(logging.INFO)
     formatter = logging.Formatter('%(asctime)s (%(levelname)s) %(message)s', datefmt='%Y-%m-%d %I:%M:%S%p')
 
     # Create console handler
     ch = logging.StreamHandler()
-    ch.setLevel(logging.DEBUG)
+    ch.setLevel(logging.INFO)
     ch.setFormatter(formatter)
     logger.addHandler(ch)
 
     # Create file handler if log_file is provided
     if log_file:
         fh = logging.FileHandler(log_file)
-        fh.setLevel(logging.DEBUG)
+        fh.setLevel(logging.INFO)
         fh.setFormatter(formatter)
         logger.addHandler(fh)
 
@@ -147,7 +147,7 @@ def map_mismatches(cs_str: str) -> list[str]:
     return cs_map
 
 
-def parse_paf(paf_file: Path, targets: dict[str, Target]) -> dict[str, Target]:
+def parse_paf(paf_file: Path, targets: dict[str, Target], queries: dict[str, SeqIO.SeqRecord]) -> dict[str, Target]:
     """
     Parse the PAF output file from a minimap2 run
 
@@ -209,6 +209,7 @@ def parse_paf(paf_file: Path, targets: dict[str, Target]) -> dict[str, Target]:
             query_start: int = int(cols[2])
             query_end: int = int(cols[3])
             target_name: str = cols[5]
+            target_len: int = int(cols[6])
             target_start: int = int(cols[7])
             target_end: int = int(cols[8])
             cs_str: str = cols[-1][5:]
@@ -216,14 +217,14 @@ def parse_paf(paf_file: Path, targets: dict[str, Target]) -> dict[str, Target]:
             # Hard disallow any insertions or deletions
             # TODO could this be done within minimap2 params?
             if re.search(r'[+\-~]', cs_str):
-                logger.info(f"Skipping {query_name} -> {target_name} due to insertions or deletions (cs: {cs_str})")
+                logger.debug(f"Skipping {query_name} -> {target_name} due to insertions or deletions (cs: {cs_str})")
                 dropped_rows += 1
                 continue
 
             # Format of the mm2 command should take care of this, but for manual runs
             # drop lines where the query sequence is not mapped in its entirety
             if query_start != 0 or query_len != query_end:
-                logger.info(f"Skipping {query_name} -> {target_name} due to partial query mapping")
+                logger.debug(f"Skipping {query_name} -> {target_name} due to partial query mapping")
                 dropped_rows += 1
                 continue
 
@@ -231,13 +232,13 @@ def parse_paf(paf_file: Path, targets: dict[str, Target]) -> dict[str, Target]:
             # We can use this to calculate the number of mismatches
             mismatches = cs_str.count('*')
             if mismatches > args.mismatches:
-                logger.info(f"Skipping {query_name} -> {target_name} due to too many mismatches ({mismatches})")
+                logger.debug(f"Skipping {query_name} -> {target_name} due to too many mismatches ({mismatches})")
                 dropped_rows += 1
                 continue
 
             cs_map = map_mismatches(cs_str)
             # Add the match to the target
-            new_match = Match(query_name, target_start, target_end, cs_map)
+            new_match = Match(query_name, queries[query_name].seq, target_start, target_end, target_len, cs_map)
             targets[target_name].add_match(new_match)
 
     logger.info(f"Processed {row_index} rows from {paf_file}")
@@ -257,6 +258,11 @@ def main(args: argparse.Namespace) -> None:
     Returns:
         None
     """
+    # Read in the query sequences
+    queries: dict[str, SeqIO.SeqRecord] = {}
+    for record in SeqIO.parse(args.input, "fasta"):
+        queries[record.id] = record
+
     # Initialize a list of Targets to store the coverage information
     targets: dict[str, Target] = {}
     for record in SeqIO.parse(args.targets, "fasta"):
@@ -279,11 +285,14 @@ def main(args: argparse.Namespace) -> None:
         input_mm2_file = "tmp_mm2_output.paf"
 
     # Extend targets with parsed minimap2 output
-    targets = parse_paf(Path(input_mm2_file), targets)
+    targets = parse_paf(Path(input_mm2_file), targets, queries)
 
     # Print the coverage information
     for target in targets.values():
         target.print_coverage()
+
+    for target in targets.values():
+        target.print_coverage_map(80)
 
     # Cleanup
     if not args.keep:

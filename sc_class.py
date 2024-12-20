@@ -7,23 +7,27 @@ class Match:
 
     """Object to store information about a match between a seq and target sequence"""
 
-    def __init__(self, seq_id: str, start: int, end: int, mismatches: list[str]) -> None:
+    def __init__(self, seq_id: str, seq: str, start: int, end: int, target_len: int, mismatches: list[str]) -> None:
         """
         Initialize a Match object with the given information
 
         Args:
             seq_id (str): The ID of the sequence that matched the target
+            seq (str): The sequence of match
             start (int): The start position of the match
             end (int): The end position of the match
+            target_len (int): The length of the target sequence
             mismatches (set[int]): Set of mismatch positions in the match.
 
         Returns:
             None
         """
         self.seq_id = seq_id
+        self.seq = seq
         self.start = start
         self.end = end
         self.mismatches = mismatches
+        self.align_seq = ["-"] * start + list(seq) + ["-"] * (target_len - end)
 
 
 class Target:
@@ -102,6 +106,20 @@ class Target:
         """
         print(f"Coverage map for target {self.id}:")
         for i in range(0, len(self.coverage_map), columns):
-            col_end = i + columns
-            print("".join([str(i) for i in self.coverage_map[i:col_end]]))
-            print("".join([str(i) for i in self.seq[i:col_end]]) + "\n")
+            col_end = min((i + columns), len(self.coverage_map))
+
+            coverage_section = self.coverage_map[i:col_end]
+            target_seq_section = self.seq[i:col_end]
+
+            # Loop through the matches, any that only contain mismatches (-) are skipped
+            for match in self.matches:
+                align = match.align_seq[i:col_end]
+                if all([i == "-" for i in align]):
+                    continue
+                print("".join(align))
+
+            # Print the coverage map and target sequence for the current section
+            coverage_str = "".join([str(i) for i in coverage_section])
+            target_seq_str = "".join([str(i) for i in target_seq_section])
+            print(coverage_str)
+            print(target_seq_str + "\n")
