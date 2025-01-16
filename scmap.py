@@ -12,12 +12,13 @@ import subprocess
 import sys
 from pathlib import Path
 
-from Bio import SeqIO
+from Bio import Entrez, SeqIO
 
 from sc_class import Match, Target
 
 ROW_FAILURE_LIMIT = 100
 PAF_ROWS = 12
+Entrez.email = "RPINerd@gmail.com"
 
 
 def configure_logger(log_file: str | None = None) -> logging.Logger:
@@ -248,6 +249,23 @@ def parse_paf(paf_file: Path, targets: dict[str, Target], queries: dict[str, Seq
     return targets
 
 
+def pull_accession(acc_id: str) -> SeqIO.SeqRecord:
+    """
+    Pull a sequence from NCBI by accession ID
+
+    Args:
+        acc_id (str): The accession ID to pull
+
+    Returns:
+        fasta_rec (SeqIO.SeqRecord): The SeqRecord object for the accession ID
+
+    Raises:
+        ValueError: If the accession ID is not found
+    """
+    # TODO Implement
+    pass
+
+
 def main(args: argparse.Namespace) -> None:
     """
     Main driver function for the script
@@ -265,15 +283,21 @@ def main(args: argparse.Namespace) -> None:
 
     # Initialize a list of Targets to store the coverage information
     targets: dict[str, Target] = {}
-    for record in SeqIO.parse(args.targets, "fasta"):
-        targets[record.id] = Target(record)
+    # If the targets are given as a list of accession ID's, pull the fastas from NCBI
+    if args.accession:
+        accession_ids = args.accession.split(",").strip()
+        for id in accession_ids:
+            targets[id] = Target(pull_accession(id))
+    else:
+        for record in SeqIO.parse(args.targets, "fasta"):
+            targets[record.id] = Target(record)
 
     # Create the minimap2 command
     try:
         input_mm2_file = args.mm2_file
 
     except AttributeError:
-        minimap2_command = [args.minimap2, "--cs", args.targets, args.input, "-o", "tmp_mm2_output.paf"]
+        minimap2_command = [args.minimap2, "-P", "--cs", args.targets, args.input, "-o", "tmp_mm2_output.paf"]
         if args.vars:
             minimap2_command.extend(args.vars.split())
         logger.info(f"Running minimap2 with command: {' '.join(minimap2_command)}")
@@ -291,8 +315,8 @@ def main(args: argparse.Namespace) -> None:
     for target in targets.values():
         target.print_coverage()
 
-    for target in targets.values():
-        target.print_coverage_map(80)
+    # for target in targets.values():
+    #     target.print_coverage_map(80)
 
     # Cleanup
     if not args.keep:
