@@ -107,8 +107,6 @@ def parse_args() -> argparse.Namespace:
         parser.error("--input is required when --minimap2 is specified")
     if not Path(args.minimap2).exists():
         parser.error(f"Minimap2 executable {Path(args.minimap2).absolute()} not found!")
-    if args.accession:
-        raise NotImplementedError("Accession ID lookup not implemented yet")
     if args.output:
         raise NotImplementedError("Output file writing not implemented yet")
 
@@ -249,7 +247,7 @@ def parse_paf(paf_file: Path, targets: dict[str, Target], queries: dict[str, Seq
     return targets
 
 
-def pull_accession(acc_id: str) -> SeqIO.SeqRecord:
+def pull_accession(acc_ids: str) -> None:
     """
     Pull a sequence from NCBI by accession ID
 
@@ -257,13 +255,21 @@ def pull_accession(acc_id: str) -> SeqIO.SeqRecord:
         acc_id (str): The accession ID to pull
 
     Returns:
-        fasta_rec (SeqIO.SeqRecord): The SeqRecord object for the accession ID
+        None
 
     Raises:
-        ValueError: If the accession ID is not found
+        ValueError: If no accession IDs are found
     """
-    # TODO Implement
-    pass
+    logger.info(f"Pulling sequences from NCBI for accession IDs: {acc_ids}")
+
+    handle = Entrez.efetch(db="nucleotide", id=",".join(acc_ids), rettype="fasta", retmode="text")
+
+    # Report if accession lookup completely fails
+    if handle is None:
+        raise ValueError(f"No accession IDs found for {acc_ids}")
+
+    with Path.open("tmp_targets.fasta", "w") as f:
+        f.write(handle.read())
 
 
 def main(args: argparse.Namespace) -> None:
@@ -285,12 +291,11 @@ def main(args: argparse.Namespace) -> None:
     targets: dict[str, Target] = {}
     # If the targets are given as a list of accession ID's, pull the fastas from NCBI
     if args.accession:
-        accession_ids = args.accession.split(",").strip()
-        for id in accession_ids:
-            targets[id] = Target(pull_accession(id))
-    else:
-        for record in SeqIO.parse(args.targets, "fasta"):
-            targets[record.id] = Target(record)
+        accession_ids = [id.strip() for id in args.accession.split(",")]
+        pull_accession(accession_ids)
+        args.targets = "tmp_targets.fasta"
+    for record in SeqIO.parse(args.targets, "fasta"):
+        targets[record.id] = Target(record)
 
     # Create the minimap2 command
     try:
@@ -315,15 +320,14 @@ def main(args: argparse.Namespace) -> None:
     for target in targets.values():
         target.print_coverage()
 
-    # for target in targets.values():
-    #     target.print_coverage_map(80)
-
     # Cleanup
     if not args.keep:
         logger.info("Cleaning up temporary files...")
         Path("tmp_mm2_output.paf").unlink()
+        Path("tmp_targets.fasta").unlink()
     else:
         Path("tmp_mm2_output.paf").rename("mm2_output.paf")
+        Path("tmp_targets.fasta").rename("requestedTargets.fasta")
 
 
 if __name__ == "__main__":
